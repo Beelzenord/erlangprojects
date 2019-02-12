@@ -56,7 +56,7 @@ lookup(List) ->
   Item = (lists:search(fun(X) -> X#docking_point.state == "Empty" end, List)),
   ListValue = tuple_to_list(Item),
   Extracted = lists:nth(2, ListValue),
-  TestPoint = Extracted#docking_point,
+  %TestPoint = #docking_point,
  % A = lists:map(fun tuple_to_list/1, A1),
   io:format("we found ~p",[Extracted]),
   if
