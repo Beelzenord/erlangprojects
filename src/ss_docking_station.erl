@@ -10,40 +10,50 @@
 -author("fno").
 
 %% API
--export([start_link/3,init/3,makeList/3,new/0,write/4,idle/1,secure_scooter/1]).
+-export([start_link/3,init/3,makeList/3,new/0,write/4,idle/1,makeBinary/4,secure_scooter/1]).
 -record(docking_point,{id,state,name}).
 
 start_link(Total,Occupied, Name)->
   register(Name,spawn(ss_docking_station,init,[Total,Occupied,Name])).
- % makeList(Total,Occupied).
+
 
 secure_scooter(Name)->
   Name ! {reserve,self()},
 receive
-    ok -> done
+  {ok} -> {done};
+  {error,full} -> {filled}
   end.
 
-init(Total,Occupied,Name)->
-  List =makeList(Total,Occupied,Name),
-  idle(List).
+init(Total,Occupied,_)->
+ % List =makeList(Total,Occupied,Name),
+  Db = makeBinary(Total,Occupied,"Empty",dbt:empty()),
+  idle(Db).
 
 new()->
   [].
+
+
 
 makeList(Total,Occupied,Name)->
   %Db = dbt:empty(),
   write(Total,Occupied,Name,[]).
 
-idle(List)->
-  io:format("~p",[List]),
+idle(Db)->
+ % io:format("~p",[List]),
   receive
     {reserve,Pid}->
-      Returned = lookup(List),
+      Returned = dbt:match("Empty",Db),
+    %  io:format("Return from match ~p~n",[Returned]),
+      %io:format("we have returned a ~p",[Key]),
       if
-         Returned =:= false ->
+         Returned =:=  {error,nonexisting}  ->
            Pid ! {error,full};
           true ->
-            Pid ! ok
+            Key = lists:nth(1,Returned),
+            Db1 = dbt:write(Key,"Occupied",Db),
+            io:format("updated ~p~n",[Db1]),
+            Pid ! {ok},
+            idle(Db1)
       end
 
 
@@ -51,26 +61,6 @@ idle(List)->
   %receive
 
 
-lookup(List) ->
-  io:format("Looking..."),
-  Item = (lists:search(fun(X) -> X#docking_point.state == "Empty" end, List)),
-  ListValue = tuple_to_list(Item),
-  Extracted = lists:nth(2, ListValue),
-  %TestPoint = #docking_point,
- % A = lists:map(fun tuple_to_list/1, A1),
-  io:format("we found ~p",[Extracted]),
-  if
-    Item == false ->
-    {error,full};
-    true ->
-      io:format("we found ~p",[Item]),
-      io:format("code"),
-      ExtractedPreviousPoint = Extracted#docking_point{state = "Occupied"},
-      lists:delete(Extracted, List),
-      lists:append([ExtractedPreviousPoint], List), {ok},
-      io:format("Print list again... ~p",[List])
-
-  end.
 
 
   % hasSpot(Name)
@@ -90,6 +80,19 @@ lookup(List) ->
  % lists:keyfind(Pid, #client.pid, State#state.clients) =/= false
  % Returned = lists:keysearch("Empty", #docking_point.state, List),
  % io:format("Value ~p",Returned).
+
+makeBinary(0,0,_,Db)->
+  io:format("does this print?"),
+  Db;
+
+makeBinary(Total,Occupied,State,Db)when Occupied=:=0->
+  DbTemp = dbt:write(Total,"Empty",Db),
+  makeBinary(Total-1,Occupied,State,DbTemp);
+
+makeBinary(Total,Occupied,State,Db)when Occupied/=0->
+  DbTemp = dbt:write(Total,"Occupied",Db),
+  makeBinary(Total-1,Occupied-1,State,DbTemp).
+
 
 
 

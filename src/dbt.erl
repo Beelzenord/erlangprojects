@@ -18,18 +18,18 @@ empty()->
 
 
 write(Key,Value,{empty})->
-  io:format("[1]Numberempty~n"),
+%  io:format("[1]Numberempty~n"),
   {Key,Value,{empty},{empty}};
 %Replace the key
 write(NewKey,Value,{CurrentKey,_,LeftValue,Right_Value}) when NewKey =:= CurrentKey ->
   {CurrentKey,Value,LeftValue,Right_Value};
 %% travers the left subtree
 write(NewKey,Value,{CurrentKey,Current_Value,LeftValue,Right_Value}) when NewKey < CurrentKey ->
-  io:format("[1]Number<~n"),
+ % io:format("[1]Number<~n"),
   {CurrentKey,Current_Value,write(NewKey,Value,LeftValue),Right_Value};
 
 write(NewKey,Value,{CurrentKey,Current_Value,LeftValue,Right_Value}) when NewKey > CurrentKey ->
-  io:format("[1]Number~n"),
+  %io:format("[1]Number~n"),
   {CurrentKey,Current_Value,LeftValue,write(NewKey,Value,Right_Value)}.
 
 
@@ -118,14 +118,14 @@ readAll(Tuple)->
 
 read(_,{empty})->
   undefined;
-read(Key, {Key,Value,Left,Right}) ->
+read(Key, {NodeKey,Value,Left,Right}) when Key ==  NodeKey->
   {ok, {Key,Value,Left,Right}};
 % {ok,{Key,Value}};
 read(Key, {NodeKey, _,LeftKey, _}) when Key < NodeKey ->
-  io:format("executing less than "),
+ % io:format("executing less than "),
   read(Key, LeftKey);
 read(Key, {_, _, _, RightKey})  ->
-  io:format("executing "),
+ % io:format("executing "),
   read(Key, RightKey).
 
 match(_,{empty})->
