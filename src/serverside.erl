@@ -17,7 +17,8 @@ start_link() ->
   gen_server:start_link({local, serverside}, serverside, [], []).
 
 init(_Args) ->
-  {ok, db:new()}.
+  io:format("here "),
+  {ok, dbt:empty()}.
 
 %% @doc Attaches the phone from the given PhoneNumber.
 -spec attach(PhoneNumber::term()) -> ok.
@@ -39,16 +40,16 @@ lookup_phone(Pid) ->
   gen_server:call(serverside, {lookup_phone, self(), Pid}).
 
 handle_call({attach, _Pid, PhoneNumber}, {From, _Ref}, Db) ->
-  {reply, ok, db:write(From, PhoneNumber, Db)};
+  {reply, ok, dbt:write(From, PhoneNumber, Db)};
 
 handle_call({detach, _Pid}, {From, _Ref}, Db) ->
-  {reply, ok, db:delete(From, Db)};
+  {reply, ok, dbt:delete(From, Db)};
 
 handle_call({lookup_id, _Pid, PhoneNumber}, _From, Db) ->
-  {reply, db:findElement(PhoneNumber, Db), Db};
+  {reply, dbt:findElement(PhoneNumber, Db), Db};
 
 handle_call({lookup_phone, _Pid, Key}, _From, Db) ->
-  {reply, db:read(Key, Db), Db}.
+  {reply, dbt:read(Key, Db), Db}.
 
 terminate(_Reason, _DB) ->
   ok.

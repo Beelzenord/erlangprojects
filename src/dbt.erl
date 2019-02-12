@@ -65,7 +65,7 @@ deleteNode(TargetKey,{Current_Key,_,LeftBranch,RightValue})when TargetKey == Cur
           %Deleted = {Current_Key,Current_Value,LeftBranch,RightValue},
           %{Current_Key} = {OtherValue},
           Deleted2 = {OtherKey,OtherValue,LeftBranch, deleteNode(OtherKey,RightValue)},
-          Deleted2
+          Deleted2 %%hehehe
 
       % {OtherKey,OtherValue,OtherLeft,deleteNode(OtherKey,OtherRight)}
 
