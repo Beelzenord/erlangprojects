@@ -10,7 +10,7 @@
 -author("fno").
 
 %% API
--export([start_link/3,init/3,makeList/3,new/0,write/4,idle/1,makeBinary/4,secure_scooter/1]).
+-export([start_link/3,init/3,makeList/3,new/0,write/4,idle/1,makeBinary/4,secure_scooter/1,release_scooter/1]).
 -record(docking_point,{id,state,name}).
 
 start_link(Total,Occupied, Name)->
@@ -18,10 +18,17 @@ start_link(Total,Occupied, Name)->
 
 
 secure_scooter(Name)->
-  Name ! {reserve,self()},
+  Name ! {secure,self()},
 receive
-  {ok} -> {done};
-  {error,full} -> {filled}
+  {ok} -> {ok};
+  {error,full} -> {error,full}
+  end.
+
+release_scooter(Name)->
+  Name ! {release,self()},
+receive
+  {ok} -> {ok};
+  {error,empty} -> {error,empty}
   end.
 
 init(Total,Occupied,_)->
@@ -41,45 +48,73 @@ makeList(Total,Occupied,Name)->
 idle(Db)->
  % io:format("~p",[List]),
   receive
-    {reserve,Pid}->
+    {secure,Pid}->
       Returned = dbt:match("Empty",Db),
     %  io:format("Return from match ~p~n",[Returned]),
       %io:format("we have returned a ~p",[Key]),
       if
          Returned =:=  {error,nonexisting}  ->
+         Pid ! {error,full},
+         handleState(Db);
+       true ->
+         Key = lists:nth(1,Returned),
+         Db1 = dbt:write(Key,"Occupied",Db),
+         io:format("updated ~p~n",[Db1]),
+         Pid ! {ok},
+         handleState(Db1)
+      end
+  end.
+  %receive
+
+handleState(Db) ->
+    IsItFull = dbt:match("Occupied", Db),
+    IsItEmpty = dbt:match("Empty",Db),
+    if
+      IsItFull =:= {error,nonexisting} ->
+        io:format("{error,empty}"),
+        empty(Db);
+      IsItEmpty =:= {error,nonexisting} ->
+        io:format("{error,full}"),
+        full(Db);
+      true ->
+        io:format("Is in idle"),
+        idle(Db)
+    end.
+
+full(Db)->
+ % io:format("~p",[List]),
+  receive
+    {secure,Pid}->
+      Pid ! {error,full},
+      full(Db)
+  end.
+  %receive
+
+
+empty(Db)->
+ % io:format("~p",[List]),
+  receive
+    {secure,Pid}->
+      ReturnedEmpty = dbt:match("Empty",Db);
+    {release, Pid} ->
+      Pid ! {error, empty},
+      empty(Db),
+
+      if
+         ReturnedEmpty =:=  {error,nonexisting}  ->
            Pid ! {error,full};
           true ->
-            Key = lists:nth(1,Returned),
+            Key = lists:nth(1,ReturnedEmpty),
             Db1 = dbt:write(Key,"Occupied",Db),
             io:format("updated ~p~n",[Db1]),
             Pid ! {ok},
-            idle(Db1)
+            handleState(Db1)
       end
 
 
   end.
   %receive
 
-
-
-
-  % hasSpot(Name)
-  % Val = lists:any(fun(X) -> X#docking_point.state == "Empty" end, List),
-  %lists:any(fun(X) -> X#docking_point == Test end, NewState#state.clients).
-  %maps:find(List,#docking_point.state="Empty")
-  % Val.
-  % io:format("Value ~p",[Val]).
-
-
- % Val = lists:keyfind(List, #docking_point.state = "Empty") =/= false,
- % io:format("Value ~p",Val).
-
-
-
- % Predicate = fun(E) -> E rem 2 == 0 end,
- % lists:keyfind(Pid, #client.pid, State#state.clients) =/= false
- % Returned = lists:keysearch("Empty", #docking_point.state, List),
- % io:format("Value ~p",Returned).
 
 makeBinary(0,0,_,Db)->
   io:format("does this print?"),
@@ -92,9 +127,6 @@ makeBinary(Total,Occupied,State,Db)when Occupied=:=0->
 makeBinary(Total,Occupied,State,Db)when Occupied/=0->
   DbTemp = dbt:write(Total,"Occupied",Db),
   makeBinary(Total-1,Occupied-1,State,DbTemp).
-
-
-
 
 
 write(0,0,_,List)->
