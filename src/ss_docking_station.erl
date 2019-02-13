@@ -10,7 +10,7 @@
 -author("fno").
 
 %% API
--export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1]).
+-export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1,break/0]).
 
 -export([init/3,makeList/3,write/4,makeBinary/4,idle/1]).
 -record(docking_point,{id,state,name}).
@@ -56,6 +56,9 @@ init(Total,Occupied,_)->
 makeList(Total,Occupied,Name)->
   %Db = dbt:empty(),
   write(Total,Occupied,Name,[]).
+
+break()->
+  {goodbye}.
 
 idle(Db)->
  % io:format("~p",[List]),
