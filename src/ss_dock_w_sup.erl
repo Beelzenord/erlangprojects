@@ -10,7 +10,7 @@
 -author("fno").
 
 %% API
--export([start_link/0,start_child/2]).
+-export([start_link/0,start_child/2,init_child/1]).
 -export([init/0]).
 
 start_link()->
@@ -23,16 +23,19 @@ init()->
 
 start_child(Total,Occupied)->
   supRef ! {start_child,Total,Occupied,self()},
-  {done}.
+  receive
+    {ok,Pid} -> {shheeiit,Pid}
+  end.
 
-init(Args)->
+
+init_child(Args)->
   io:format("my list ~p",[Args]).
 
 
 loop(Children) ->
   receive
     {start_child,Total,Occupied,ClientPid}->
-      Pid = spawn_link(ss_dock_w_sup, init_child, [Total,Occupied]),
+      Pid = spawn_link(ss_docking_station, start_link, [Total,Occupied,kth]),
       ClientPid ! {ok, Pid}
      % loop([{Pid, 1, Mod, Func, Args}|Children]);
      % io:format("received ~p and ",[Total])
