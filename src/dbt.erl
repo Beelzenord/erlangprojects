@@ -83,7 +83,7 @@ deleteNode(TargetKey,{CurrentKey,CurrentValue,CurrentLeft,CurrentRight}) when Ta
   {CurrentKey,CurrentValue,CurrentLeft,deleteNode(TargetKey,CurrentRight)};
 
 deleteNode(Target,{CurrentKey,CurrentValue,CurrentLeft,CurrentRight}) when Target < CurrentKey ->
-  io:format("Less than invoked"),
+ % io:format("Less than invoked"),
   {CurrentKey,CurrentValue,deleteNode(Target,CurrentLeft),CurrentRight};
 
 deleteNode(_,{empty})->

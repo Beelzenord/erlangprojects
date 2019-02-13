@@ -62,7 +62,21 @@ idle(Db)->
          io:format("updated ~p~n",[Db1]),
          Pid ! {ok},
          handleState(Db1)
-      end
+      end;
+      {release,Pid}->
+        ReturnedOccupied = dbt:match("Occupied",Db),
+        if
+          ReturnedOccupied =:=  {error,nonexisting}  ->
+            Pid ! {error,empty},
+            handleState(Db);
+          true->
+            KeyOccupied = lists:nth(1,ReturnedOccupied),
+            Db2 = dbt:write(KeyOccupied,"Empty",Db),
+            io:format("updated to empty ~p~n",[Db2]),
+            Pid ! {ok},
+            handleState(Db2)
+         end
+
   end.
   %receive
 
@@ -86,7 +100,24 @@ full(Db)->
   receive
     {secure,Pid}->
       Pid ! {error,full},
-      full(Db)
+      full(Db);
+    {release,Pid}->
+      ReturnedOccupied = dbt:match("Occupied",Db),
+      if
+        ReturnedOccupied =:=  {error,nonexisting}  ->
+          Pid ! {error,empty},
+          handleState(Db);
+        true->
+          KeyOccupied = lists:nth(1,ReturnedOccupied),
+          Db2 = dbt:write(KeyOccupied,"Empty",Db),
+          io:format("updated to empty ~p~n",[Db2]),
+          Pid ! {ok},
+          handleState(Db2)
+      end
+
+
+
+
   end.
   %receive
 
@@ -95,21 +126,14 @@ empty(Db)->
  % io:format("~p",[List]),
   receive
     {secure,Pid}->
-      ReturnedEmpty = dbt:match("Empty",Db);
+      ReturnedEmpty = dbt:match("Empty",Db),
+      Key = lists:nth(1,ReturnedEmpty),
+      Db1 = dbt:write(Key,"Occupied",Db),
+      Pid ! {ok},
+      handleState(Db1);
     {release, Pid} ->
       Pid ! {error, empty},
-      empty(Db),
-
-      if
-         ReturnedEmpty =:=  {error,nonexisting}  ->
-           Pid ! {error,full};
-          true ->
-            Key = lists:nth(1,ReturnedEmpty),
-            Db1 = dbt:write(Key,"Occupied",Db),
-            io:format("updated ~p~n",[Db1]),
-            Pid ! {ok},
-            handleState(Db1)
-      end
+      empty(Db)
 
 
   end.
@@ -117,7 +141,6 @@ empty(Db)->
 
 
 makeBinary(0,0,_,Db)->
-  io:format("does this print?"),
   Db;
 
 makeBinary(Total,Occupied,State,Db)when Occupied=:=0->
@@ -135,4 +158,5 @@ write(Total,Occupied,Name, List)when Occupied /= 0 ->
   [#docking_point{id = Total,state = "Occupied",name = Name}|write(Total-1,Occupied-1,Name,List)];
 write(Total,Occupied,Name, List)when Occupied =:= 0 ->
   [#docking_point{id = Total,state = "Empty",name = Name}|write(Total-1,Occupied,Name,List)].
+
 
