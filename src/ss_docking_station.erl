@@ -10,11 +10,23 @@
 -author("fno").
 
 %% API
--export([start_link/3,init/3,makeList/3,new/0,write/4,idle/1,makeBinary/4,secure_scooter/1,release_scooter/1]).
+-export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1]).
+
+-export([init/3,makeList/3,write/4,makeBinary/4,idle/1]).
 -record(docking_point,{id,state,name}).
+
+start_link(Total,Occupied, _)when Occupied > Total->
+  {error, "Number of occupied docking points cannot exceed the number of actual docking points"};
 
 start_link(Total,Occupied, Name)->
   register(Name,spawn(ss_docking_station,init,[Total,Occupied,Name])).
+
+
+get_info(Name)->
+  Name ! {getinfo,self()},
+  receive
+    {ok,List}-> List
+  end.
 
 
 secure_scooter(Name)->
@@ -34,10 +46,10 @@ receive
 init(Total,Occupied,_)->
  % List =makeList(Total,Occupied,Name),
   Db = makeBinary(Total,Occupied,"Empty",dbt:empty()),
-  idle(Db).
+  handleState(Db).
+  %idle(Db).
 
-new()->
-  [].
+
 
 
 
@@ -48,6 +60,10 @@ makeList(Total,Occupied,Name)->
 idle(Db)->
  % io:format("~p",[List]),
   receive
+    {getinfo,Pid}->
+      List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
+      Pid ! {ok,List},
+      idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
     %  io:format("Return from match ~p~n",[Returned]),
@@ -85,19 +101,23 @@ handleState(Db) ->
     IsItEmpty = dbt:match("Empty",Db),
     if
       IsItFull =:= {error,nonexisting} ->
-        io:format("{error,empty}"),
+      %  io:format("{error,empty}"),
         empty(Db);
       IsItEmpty =:= {error,nonexisting} ->
-        io:format("{error,full}"),
+     %   io:format("{error,full}"),
         full(Db);
       true ->
-        io:format("Is in idle"),
+      %  io:format("Is in idle"),
         idle(Db)
     end.
 
 full(Db)->
  % io:format("~p",[List]),
   receive
+    {getinfo,Pid}->
+      List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
+      Pid ! {ok,List},
+      full(Db);
     {secure,Pid}->
       Pid ! {error,full},
       full(Db);
@@ -125,6 +145,10 @@ full(Db)->
 empty(Db)->
  % io:format("~p",[List]),
   receive
+    {getinfo,Pid}->
+      List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
+      Pid ! {ok,List},
+      empty(Db);
     {secure,Pid}->
       ReturnedEmpty = dbt:match("Empty",Db),
       Key = lists:nth(1,ReturnedEmpty),
@@ -134,8 +158,6 @@ empty(Db)->
     {release, Pid} ->
       Pid ! {error, empty},
       empty(Db)
-
-
   end.
   %receive
 

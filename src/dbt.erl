@@ -11,8 +11,8 @@
 
 %% API
 
--export([empty/0,write/3,read/2,delete/2,deleteNode/2,findSmallest/1,readAll/1,findParent/1,match/2]).
-
+-export([empty/0,write/3,read/2,delete/2,deleteNode/2,findSmallest/1,readAll/1,findParent/1,match/2,countNode/1,countEmpty/1]).
+-export([countOccupied/1]).
 empty()->
   {empty}.
 
@@ -147,3 +147,36 @@ match(Value,{_,T_Value,Left,Right})when Value /=T_Value->
       LeftAlt ++ RightAlt
 
   end.
+
+
+countNode({empty})->
+  0;
+countNode({_,_,Left,Right})->
+  1 + countNode(Left) + countNode(Right).
+
+countEmpty({empty})->
+  0;
+
+countEmpty({_,Value,Left,Right})->
+  if
+    Value == "Empty"->
+      Count = 1 + countEmpty(Left) + countEmpty(Right),
+      Count;
+    Value == "Occupied"->
+      Count2 = countEmpty(Left) + countEmpty(Right),
+      Count2
+  end.
+
+countOccupied({empty})->
+  0;
+
+countOccupied({_,Value,Left,Right})->
+  if
+    Value == "Occupied"->
+      Count = 1 + countOccupied(Left) + countOccupied(Right),
+      Count;
+    Value == "Empty"->
+      Count2 = countOccupied(Left) + countOccupied(Right),
+      Count2
+  end.
+
