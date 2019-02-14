@@ -10,7 +10,7 @@
 -author("fno").
 
 %% API
--export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1,break/0]).
+-export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1]).
 -export([init/3,makeList/3,write/4,makeBinary/4,idle/1,exit_station/1]).
 -record(docking_point,{id,state,name}).
 
@@ -55,8 +55,9 @@ makeList(Total,Occupied,Name)->
   %Db = dbt:empty(),
   write(Total,Occupied,Name,[]).
 
-break()->
-  {goodbye}.
+send_update(Add, Db) ->
+  Occupied = dbt:countOccupied(Db)+Add,
+  ss_dock_w_sup:update(self(),Occupied).
 
 idle(Db)->
  % io:format("~p",[List]),
@@ -69,7 +70,6 @@ idle(Db)->
       io:format("Process info: ~p", [get()]),
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
-      supRef !
       idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
@@ -78,9 +78,9 @@ idle(Db)->
          Pid ! {error,full},
          handleState(Db);
        true ->
+         send_update(1, Db),
          Key = lists:nth(1,Returned),
          Db1 = dbt:write(Key,"Occupied",Db),
-         io:format("updated ~p~n",[Db1]),
          Pid ! {ok},
          handleState(Db1)
       end;
@@ -92,6 +92,7 @@ idle(Db)->
             Pid ! {error,empty},
             handleState(Db);
           true->
+            send_update(-1, Db),
             KeyOccupied = lists:nth(1,ReturnedOccupied),
             Db2 = dbt:write(KeyOccupied,"Empty",Db),
             io:format("updated to empty ~p~n",[Db2]),
@@ -137,6 +138,7 @@ full(Db)->
           Pid ! {error,empty},
           handleState(Db);
         true->
+          send_update(-1, Db),
           KeyOccupied = lists:nth(1,ReturnedOccupied),
           Db2 = dbt:write(KeyOccupied,"Empty",Db),
           io:format("updated to empty ~p~n",[Db2]),
@@ -159,6 +161,7 @@ empty(Db)->
       Pid ! {ok,List},
       empty(Db);
     {secure,Pid}->
+      send_update(1, Db),
       ReturnedEmpty = dbt:match("Empty",Db),
       Key = lists:nth(1,ReturnedEmpty),
       Db1 = dbt:write(Key,"Occupied",Db),
