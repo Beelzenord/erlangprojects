@@ -48,14 +48,8 @@ receive
   end.
 
 init(Total,Occupied,_)->
- % List =makeList(Total,Occupied,Name),
   Db = makeBinary(Total,Occupied,"Empty",dbt:empty()),
   handleState(Db).
-  %idle(Db).
-
-
-
-
 
 makeList(Total,Occupied,Name)->
   %Db = dbt:empty(),
@@ -72,8 +66,10 @@ idle(Db)->
       Pid ! {ok, abnormal},
       exit(abnormal);
     {getinfo,Pid}->
+      io:format("Process info: ~p", [get()]),
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
+      supRef !
       idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),

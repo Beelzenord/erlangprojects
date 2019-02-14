@@ -34,17 +34,16 @@ init_child(Args)->
 
 loop(Children, EndNumber) ->
   receive
-
-
     {start_child,Total,Occupied,ClientPid}->
       %Create new docking station and keep reference to it
-
       UniqueID = list_to_atom("Ref"++integer_to_list(EndNumber)),
       RefAndPid = spawn_monitor(ss_docking_station, init, [Total,Occupied,UniqueID]), %returns a tuple, first item is ref
       Pid = element(1, RefAndPid),
-      register(UniqueID, Pid),
-      io:format("unique id ~p", [UniqueID]),
 
+      %Link name to this id
+      register(UniqueID, Pid),
+
+      %Return reference to the process
       ClientPid ! {ok, UniqueID},
       loop([Children]++[{Pid, Total, Occupied, UniqueID}], EndNumber+1);
     {'DOWN', Ref, process, Pid, Reason}->
