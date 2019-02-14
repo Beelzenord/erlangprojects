@@ -56,21 +56,20 @@ loop(Children, EndNumber) ->
 
       %Return reference to the process
       ClientPid ! {ok, UniqueID},
-      loop([Children]++[{Pid, Total, Occupied, UniqueID}], EndNumber+1);
+      NewChildren = lists:append([{Pid, Total, Occupied, UniqueID}], Children),
+      loop(NewChildren, EndNumber+1);
     {'DOWN', Ref, process, Pid, Reason}->
       %erlang:demonitor(Ref),
-
+      io:format("Children: ~p~n", [Children]),
+      io:format("Pid: ~p~n", [Pid]),
       %Retrieve old values from crashed docking station
       OldValues = lists:keyfind(Pid, 1, Children),
-      io:format("Pid: ~p", [Pid]),
-      io:format("OldRef: ~p", [OldValues]),
       OldTotal = element(2, OldValues),
       OldOccupied = element(3, OldValues),
       OldRef = element(4, OldValues),
 
       %Remove old references
       NewChildren = lists:keydelete(Pid, 1, Children),
-      %unregister(OldRef),
 
       %Restart station
       RefAndPid = spawn_monitor(ss_docking_station, init, [OldTotal,OldOccupied,OldRef]),
@@ -79,6 +78,7 @@ loop(Children, EndNumber) ->
 
       %Add station to supervisor
       UpdatedChildren = lists:append([{NewPid, OldTotal, OldOccupied, OldRef}], NewChildren),
+      io:format("UpdatedChildren: ~p~n", [UpdatedChildren]),
 
       loop(UpdatedChildren, EndNumber+1)
   end.
