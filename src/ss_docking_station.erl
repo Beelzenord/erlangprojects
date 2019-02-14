@@ -23,7 +23,7 @@ start_link(Total,Occupied, Name)->
 exit_station(Name)->
   Name ! {exitStation, self()},
   receive
-    {ok, exit_station} -> {ok, exit_station}
+    {ok, Reason} -> {ok, Reason}
   end.
 
 get_info(Name)->
@@ -69,11 +69,13 @@ idle(Db)->
   receive
     {exitStation, Pid} ->
       io:format("from child, exiting.. ~p", [Pid]),
-      exit(abnormal);
+      Pid ! {ok, no_activity},
+      exit(no_activity);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
-      idle(Db);
+      exit(no_activity);
+      %idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
       if
