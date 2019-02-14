@@ -8,24 +8,22 @@
 %%%-------------------------------------------------------------------
 -module(ss_dock_w_sup).
 -author("fno").
--behavior(supervisor).
 
 %% API
--export([start_link/0,start_child/2,init_child/1]).
--export([init/0,exit_child/1]).
+-export([start_link/0,start_child/2,init_child/1, update/2]).
+-export([init/0]).
 
 start_link()->
-  %SupRef= supervisor:start_link({local, ss_dock_w_sup}, ?MODULE, []),
- % supervisor:start_link(ss_dock_w_sup, []),
- % SupRef = erlang:monitor(process, Pid),
-   %  Pid = spawn(ss_dock_w_sup,init,[]),
-  register(supRef,spawn(ss_dock_w_sup,init,[])),
+  SupPid = spawn(ss_dock_w_sup,init,[]),
+  register(supRef, SupPid),
   {ok,supRef}.
 init()->
-  io:format("initialising"),
-  process_flag(trap_exit, true),
+  %process_flag(trap_exit, true),
   %{ok, {{one_for_one, 6, 3600}, []}},
   loop([], 0).
+
+update(Pid, Occupied) ->
+  supRef ! {update, Pid, Occupied}.
 
 start_child(Total,Occupied)->
   supRef ! {start_child,Total,Occupied,self()},
@@ -33,27 +31,54 @@ start_child(Total,Occupied)->
     {ok,Pid} -> {ok,Pid}
   end.
 
-exit_child(Pid)->
-  supRef ! {'EXIT',Pid,normal}.
-
-
 init_child(Args)->
   io:format("my list ~p",[Args]).
 
 loop(Children, EndNumber) ->
   receive
-    {start_child,Total,Occupied,ClientPid}->
-      RefToDb = list_to_atom("Ref"++integer_to_list(EndNumber)),
-      Pid = spawn_link(ss_docking_station, start_link, [Total,Occupied,RefToDb]),
-      io:format("Pid ~p",[Pid]),
-      [Children|Pid],
-      ClientPid ! {ok, RefToDb},
-      loop([Children], EndNumber+1);
-    {'EXIT',Pid,normal}->
-
+    {update, Pid, Occupied}->
+      OldValues = lists:keyfind(Pid, 1, Children),
+      OldTotal = element(2, OldValues),
+      OldRef = element(4, OldValues),
       NewChildren = lists:keydelete(Pid, 1, Children),
-     % Pid = spawn_link(ss_docking_station, start_link, [Total,Occupied,RefToDb]),
-      loop([NewChildren], EndNumber)
-     % loop([{Pid, 1, Mod, Func, Args}|Children]);
-     % io:format("received ~p and ",[Total])
+      UpdatedChildren = lists:append([{Pid, OldTotal, Occupied, OldRef}], NewChildren),
+      io:format("Updating occupied... ~p", [Occupied]),
+      loop(UpdatedChildren, EndNumber);
+
+    {start_child,Total,Occupied,ClientPid}->
+      %Create new docking station and keep reference to it
+      UniqueID = list_to_atom("Ref"++integer_to_list(EndNumber)),
+      RefAndPid = spawn_monitor(ss_docking_station, init, [Total,Occupied,UniqueID]), %returns a tuple, first item is ref
+      Pid = element(1, RefAndPid),
+
+      %Link name to this id
+      register(UniqueID, Pid),
+
+      %Return reference to the process
+      ClientPid ! {ok, UniqueID},
+      loop([Children]++[{Pid, Total, Occupied, UniqueID}], EndNumber+1);
+    {'DOWN', Ref, process, Pid, Reason}->
+      %erlang:demonitor(Ref),
+
+      %Retrieve old values from crashed docking station
+      OldValues = lists:keyfind(Pid, 1, Children),
+      io:format("Pid: ~p", [Pid]),
+      io:format("OldRef: ~p", [OldValues]),
+      OldTotal = element(2, OldValues),
+      OldOccupied = element(3, OldValues),
+      OldRef = element(4, OldValues),
+
+      %Remove old references
+      NewChildren = lists:keydelete(Pid, 1, Children),
+      %unregister(OldRef),
+
+      %Restart station
+      RefAndPid = spawn_monitor(ss_docking_station, init, [OldTotal,OldOccupied,OldRef]),
+      NewPid = element(1, RefAndPid),
+      register(OldRef, NewPid),
+
+      %Add station to supervisor
+      UpdatedChildren = lists:append([{NewPid, OldTotal, OldOccupied, OldRef}], NewChildren),
+
+      loop(UpdatedChildren, EndNumber+1)
   end.

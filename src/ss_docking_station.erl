@@ -10,9 +10,8 @@
 -author("fno").
 
 %% API
--export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1,break/0]).
-
--export([init/3,makeList/3,write/4,makeBinary/4,idle/1]).
+-export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1]).
+-export([init/3,makeList/3,write/4,makeBinary/4,idle/1,exit_station/1]).
 -record(docking_point,{id,state,name}).
 
 start_link(Total,Occupied, _)when Occupied > Total->
@@ -21,6 +20,11 @@ start_link(Total,Occupied, _)when Occupied > Total->
 start_link(Total,Occupied, Name)->
   register(Name,spawn(ss_docking_station,init,[Total,Occupied,Name])).
 
+exit_station(Name)->
+  Name ! {exitStation, self()},
+  receive
+    {ok, Reason} -> {ok, Reason}
+  end.
 
 get_info(Name)->
   Name ! {getinfo,self()},
@@ -44,58 +48,57 @@ receive
   end.
 
 init(Total,Occupied,_)->
- % List =makeList(Total,Occupied,Name),
   Db = makeBinary(Total,Occupied,"Empty",dbt:empty()),
   handleState(Db).
-  %idle(Db).
-
-
-
-
 
 makeList(Total,Occupied,Name)->
   %Db = dbt:empty(),
   write(Total,Occupied,Name,[]).
 
-break()->
-  {goodbye}.
+send_update(Add, Db) ->
+  Occupied = dbt:countOccupied(Db)+Add,
+  ss_dock_w_sup:update(self(),Occupied).
 
 idle(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
+      io:format("Process info: ~p", [get()]),
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
       idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
-    %  io:format("Return from match ~p~n",[Returned]),
-      %io:format("we have returned a ~p",[Key]),
       if
          Returned =:=  {error,nonexisting}  ->
          Pid ! {error,full},
          handleState(Db);
        true ->
+         send_update(1, Db),
          Key = lists:nth(1,Returned),
          Db1 = dbt:write(Key,"Occupied",Db),
-         io:format("updated ~p~n",[Db1]),
          Pid ! {ok},
          handleState(Db1)
       end;
       {release,Pid}->
+
         ReturnedOccupied = dbt:match("Occupied",Db),
         if
           ReturnedOccupied =:=  {error,nonexisting}  ->
             Pid ! {error,empty},
             handleState(Db);
           true->
+            send_update(-1, Db),
             KeyOccupied = lists:nth(1,ReturnedOccupied),
             Db2 = dbt:write(KeyOccupied,"Empty",Db),
             io:format("updated to empty ~p~n",[Db2]),
             Pid ! {ok},
             handleState(Db2)
          end
-
   end.
   %receive
 
@@ -117,6 +120,10 @@ handleState(Db) ->
 full(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
@@ -131,16 +138,13 @@ full(Db)->
           Pid ! {error,empty},
           handleState(Db);
         true->
+          send_update(-1, Db),
           KeyOccupied = lists:nth(1,ReturnedOccupied),
           Db2 = dbt:write(KeyOccupied,"Empty",Db),
           io:format("updated to empty ~p~n",[Db2]),
           Pid ! {ok},
           handleState(Db2)
       end
-
-
-
-
   end.
   %receive
 
@@ -148,11 +152,16 @@ full(Db)->
 empty(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
       empty(Db);
     {secure,Pid}->
+      send_update(1, Db),
       ReturnedEmpty = dbt:match("Empty",Db),
       Key = lists:nth(1,ReturnedEmpty),
       Db1 = dbt:write(Key,"Occupied",Db),
