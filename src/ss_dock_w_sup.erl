@@ -10,7 +10,7 @@
 -author("fno").
 
 %% API
--export([start_link/0,start_child/2,init_child/1]).
+-export([start_link/0,start_child/2,init_child/1, update/2]).
 -export([init/0]).
 
 start_link()->
@@ -22,18 +22,29 @@ init()->
   %{ok, {{one_for_one, 6, 3600}, []}},
   loop([], 0).
 
-
+update(Pid, Occupied) ->
+  supRef ! {update, Pid, Occupied}.
 
 start_child(Total,Occupied)->
   supRef ! {start_child,Total,Occupied,self()},
   receive
     {ok,Pid} -> {ok,Pid}
   end.
+
 init_child(Args)->
   io:format("my list ~p",[Args]).
 
 loop(Children, EndNumber) ->
   receive
+    {update, Pid, Occupied}->
+      OldValues = lists:keyfind(Pid, 1, Children),
+      OldTotal = element(2, OldValues),
+      OldRef = element(4, OldValues),
+      NewChildren = lists:keydelete(Pid, 1, Children),
+      UpdatedChildren = lists:append([{Pid, OldTotal, Occupied, OldRef}], NewChildren),
+      io:format("Updating occupied... ~p", [Occupied]),
+      loop(UpdatedChildren, EndNumber);
+
     {start_child,Total,Occupied,ClientPid}->
       %Create new docking station and keep reference to it
       UniqueID = list_to_atom("Ref"++integer_to_list(EndNumber)),
