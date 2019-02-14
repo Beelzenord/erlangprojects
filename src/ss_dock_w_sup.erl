@@ -34,38 +34,41 @@ init_child(Args)->
 
 loop(Children, EndNumber) ->
   receive
+
+
     {start_child,Total,Occupied,ClientPid}->
       %Create new docking station and keep reference to it
 
-      io:format(" Me before creating child ~p", [self()]),
       UniqueID = list_to_atom("Ref"++integer_to_list(EndNumber)),
-      Pid = spawn_monitor(ss_docking_station, init, [Total,Occupied,UniqueID]), %returns a tuple, first item is ref
-      RefToDb = element(1, Pid),
+      RefAndPid = spawn_monitor(ss_docking_station, init, [Total,Occupied,UniqueID]), %returns a tuple, first item is ref
+      Pid = element(1, RefAndPid),
+      register(UniqueID, Pid),
+      io:format("unique id ~p", [UniqueID]),
 
-      io:format(" Me after creating child ~p", [self()]),
-      ClientPid ! {ok, RefToDb},
-      loop([Children]++[{RefToDb, Total, Occupied, UniqueID}], EndNumber+1);
-    {'DOWN', Ref, process, Pid2, Reason}->
-%      erlang:demonitor(Ref),
+      ClientPid ! {ok, UniqueID},
+      loop([Children]++[{Pid, Total, Occupied, UniqueID}], EndNumber+1);
+    {'DOWN', Ref, process, Pid, Reason}->
+      %erlang:demonitor(Ref),
 
       %Retrieve old values from crashed docking station
-%      OldRef = lists:keyfind(Pid, 1, Children),
-%      io:format("oldref: ~p", [OldRef]),
-%      OldTotal = element(2, OldRef),
-%      OldOccupied = element(3, OldRef),
-%      OldID = element(4, OldRef),
-%      io:format("Pid: ~p", [Pid]),
-%      io:format("OldID: ~p", [OldID]),
+      OldValues = lists:keyfind(Pid, 1, Children),
+      io:format("Pid: ~p", [Pid]),
+      io:format("OldRef: ~p", [OldValues]),
+      OldTotal = element(2, OldValues),
+      OldOccupied = element(3, OldValues),
+      OldRef = element(4, OldValues),
 
-      %Remove old reference
-%      NewChildren = lists:keydelete(Pid, 1, Children),
+      %Remove old references
+      NewChildren = lists:keydelete(Pid, 1, Children),
+      %unregister(OldRef),
 
       %Restart station
-%      NewPid = spawn_link(ss_docking_station, init, [OldTotal,OldOccupied,OldID]),
+      RefAndPid = spawn_monitor(ss_docking_station, init, [OldTotal,OldOccupied,OldRef]),
+      NewPid = element(1, RefAndPid),
+      register(OldRef, NewPid),
 
       %Add station to supervisor
-%      UpdatedChildren = lists:append([{NewPid, OldTotal, OldOccupied, OldID}], NewChildren),
-%      io:format("before loop: "),
+      UpdatedChildren = lists:append([{NewPid, OldTotal, OldOccupied, OldRef}], NewChildren),
 
-      loop(Children, EndNumber)
+      loop(UpdatedChildren, EndNumber+1)
   end.

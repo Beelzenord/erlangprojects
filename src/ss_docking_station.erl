@@ -69,13 +69,12 @@ idle(Db)->
   receive
     {exitStation, Pid} ->
       io:format("from child, exiting.. ~p", [Pid]),
-      Pid ! {ok, no_activity},
-      exit(no_activity);
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
-      exit(no_activity);
-      %idle(Db);
+      idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
       if
@@ -124,6 +123,10 @@ handleState(Db) ->
 full(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
@@ -144,10 +147,6 @@ full(Db)->
           Pid ! {ok},
           handleState(Db2)
       end
-
-
-
-
   end.
   %receive
 
@@ -155,6 +154,10 @@ full(Db)->
 empty(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      Pid ! {ok, abnormal},
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
