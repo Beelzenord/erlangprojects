@@ -11,8 +11,7 @@
 
 %% API
 -export([start_link/3,secure_scooter/1,release_scooter/1,get_info/1,break/0]).
-
--export([init/3,makeList/3,write/4,makeBinary/4,idle/1]).
+-export([init/3,makeList/3,write/4,makeBinary/4,idle/1,exit_station/1]).
 -record(docking_point,{id,state,name}).
 
 start_link(Total,Occupied, _)when Occupied > Total->
@@ -21,6 +20,11 @@ start_link(Total,Occupied, _)when Occupied > Total->
 start_link(Total,Occupied, Name)->
   register(Name,spawn(ss_docking_station,init,[Total,Occupied,Name])).
 
+exit_station(Name)->
+  Name ! {exitStation, self()},
+  receive
+    {ok, exit_station} -> {ok, exit_station}
+  end.
 
 get_info(Name)->
   Name ! {getinfo,self()},
@@ -63,14 +67,15 @@ break()->
 idle(Db)->
  % io:format("~p",[List]),
   receive
+    {exitStation, Pid} ->
+      io:format("from child, exiting.. ~p", [Pid]),
+      exit(abnormal);
     {getinfo,Pid}->
       List = [{total,dbt:countNode(Db)},{occupied,dbt:countOccupied(Db)},{free,dbt:countEmpty(Db)}],
       Pid ! {ok,List},
       idle(Db);
     {secure,Pid}->
       Returned = dbt:match("Empty",Db),
-    %  io:format("Return from match ~p~n",[Returned]),
-      %io:format("we have returned a ~p",[Key]),
       if
          Returned =:=  {error,nonexisting}  ->
          Pid ! {error,full},
@@ -83,6 +88,7 @@ idle(Db)->
          handleState(Db1)
       end;
       {release,Pid}->
+
         ReturnedOccupied = dbt:match("Occupied",Db),
         if
           ReturnedOccupied =:=  {error,nonexisting}  ->
@@ -95,7 +101,6 @@ idle(Db)->
             Pid ! {ok},
             handleState(Db2)
          end
-
   end.
   %receive
 
