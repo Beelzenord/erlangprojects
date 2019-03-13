@@ -13,82 +13,72 @@
 
 -export([empty/0,write/3,read/2,delete/2,deleteNode/2,findSmallest/1,readAll/1,findParent/1,match/2,countNode/1,countEmpty/1]).
 -export([countOccupied/1]).
+
+%%Node begins with empty tuple
 empty()->
   {empty}.
 
-
+%%New node begins with two empty sub-trees
 write(Key,Value,{empty})->
-%  io:format("[1]Numberempty~n"),
   {Key,Value,{empty},{empty}};
-%Replace the key
+% If the key matches, it's value will be replaced while keeping the left/right subtree references
 write(NewKey,Value,{CurrentKey,_,LeftValue,Right_Value}) when NewKey =:= CurrentKey ->
   {CurrentKey,Value,LeftValue,Right_Value};
-%% travers the left subtree
+%% traverse the left subtree when it's key value is less than the root key
 write(NewKey,Value,{CurrentKey,Current_Value,LeftValue,Right_Value}) when NewKey < CurrentKey ->
- % io:format("[1]Number<~n"),
   {CurrentKey,Current_Value,write(NewKey,Value,LeftValue),Right_Value};
-
+%% Traverse the right subtree when the key value is higher than the root key
 write(NewKey,Value,{CurrentKey,Current_Value,LeftValue,Right_Value}) when NewKey > CurrentKey ->
-  %io:format("[1]Number~n"),
   {CurrentKey,Current_Value,LeftValue,write(NewKey,Value,Right_Value)}.
 
 
 delete(_,{empty})->
   {empty};
-
+%We return a reconstructed tree if we find a target
 delete(Target, {CurrentKey,Value,LeftBranch,RightValue}) ->
   NewNode = deleteNode(Target,{CurrentKey,Value,LeftBranch,RightValue}),
   NewNode.
 
-
+%We found the Target
 deleteNode(TargetKey,{Current_Key,_,LeftBranch,RightValue})when TargetKey == Current_Key->
   if
     (LeftBranch == {empty} andalso RightValue == {empty})->
-      %    io:write("emptying"),
-      {empty};
+      {empty};  % No subtree - we can safely remove the node
     LeftBranch == {empty} ->
-      RightValue;
+      RightValue; % One subtree - we replace the node with the non-empty tree
     RightValue == {empty} ->
       LeftBranch;
-    true->
+    true-> % the node-to-be-deleted has two subtres
       {RightToNodeDeleted,RValue,RLeft,RRight} = RightValue,
       if
-      % if the  right subtree of the to be deleted node has no left node then th
+      % if the right Node of the to-be-deleted node has no left node then we replace the to-be-deleted node
+      % with that node.
         (RLeft == {empty})->
           {RightToNodeDeleted,RValue,LeftBranch,RRight};
         true->
-          %%find the smallest on the right side of the to-be-deleted node
-          {OtherKey,OtherValue,OtherLeft,OtherRight} = findSmallest(RightValue),%C
-          Tmp = {ParentKey,ParentValue,_,ParentRight} = findParent(RightValue),%E
-          %Make the the parant left subtree point to the right of the to-be-deleted node
+          %%we'll find the smallest node on the right side of the to-be-deleted node
+          {OtherKey,OtherValue,OtherLeft,OtherRight} = findSmallest(RightValue),
+          %Make the the parent left subtree point to the right of the to-be-deleted node
+          %while the smallest node will take the place of the to-be-deleted node
+          Tmp = {ParentKey,ParentValue,_,ParentRight} = findParent(RightValue),
           Tmp= {ParentKey,ParentValue, {OtherKey,OtherValue,OtherLeft,OtherRight},ParentRight},
-          %Deleted = {Current_Key,Current_Value,LeftBranch,RightValue},
-          %{Current_Key} = {OtherValue},
+          %Now the smallest node exists in two places, we need to be rid of it.
           Deleted2 = {OtherKey,OtherValue,LeftBranch, deleteNode(OtherKey,RightValue)},
           Deleted2 %%hehehe
-
-      % {OtherKey,OtherValue,OtherLeft,deleteNode(OtherKey,OtherRight)}
-
-      %
-      % DecLeft = LeftBranch
       end
-  % NodeToMove = RightValue,
-  %   ParentOfNode = {Key,Value,LeftBranch,RightValue}
-  %take the smallest node on the right subtree
-  %   {TempKey,TempValue,TempLeft,TempRight} = findSmallest(RightValue),
-  %   TempLeft = LeftBranch
+
   end;
 
+%traverse the left subtree
 deleteNode(TargetKey,{CurrentKey,CurrentValue,CurrentLeft,CurrentRight}) when TargetKey > CurrentKey ->
   {CurrentKey,CurrentValue,CurrentLeft,deleteNode(TargetKey,CurrentRight)};
-
+%traverse the right subtree
 deleteNode(Target,{CurrentKey,CurrentValue,CurrentLeft,CurrentRight}) when Target < CurrentKey ->
- % io:format("Less than invoked"),
   {CurrentKey,CurrentValue,deleteNode(Target,CurrentLeft),CurrentRight};
-
+%no node found
 deleteNode(_,{empty})->
   {empty}.
-
+%find the second smallest node on a subtree - essential for delete method
 findParent({Key,Value,Left,Right})->
   {_,_,TempL,_} = Left,
 
@@ -98,7 +88,7 @@ findParent({Key,Value,Left,Right})->
       findParent(Left)
   end.
 
-
+%finds the smallest node
 findSmallest({_,_,Left,_})when Left /= {empty}->
   findSmallest(Left);
 
@@ -106,47 +96,31 @@ findSmallest({Key,Value,Left,Right}) ->
   {Key,Value,Left,Right}.
 
 
-%{TempKey,TmpValue,TmpLeft,TempRight}= read(Key,{CurrentKey,Value,LeftValue,Right}),
-%Val = red
-%{CurrentKey = LeftValue}.
-% read(Key,{CurrentKey,Value,LeftValue,Right}).
-
-
-%%db:read(ola, Db3).
 readAll(Tuple)->
   Tuple.
 
 read(_,{empty})->
   undefined;
-read(Key, {NodeKey,Value,Left,Right}) when Key ==  NodeKey->
-  {ok, {Key,Value,Left,Right}};
-% {ok,{Key,Value}};
+%Key matches, returns the key and the value
+read(Key, {NodeKey,Value,_,_}) when Key ==  NodeKey->
+  {ok, {Key,Value}};
+%Key is smaller than the current node, we traverse the left subtree
 read(Key, {NodeKey, _,LeftKey, _}) when Key < NodeKey ->
- % io:format("executing less than "),
   read(Key, LeftKey);
+%Key is bigger than the current node, we traverse the right subtree
 read(Key, {_, _, _, RightKey})  ->
- % io:format("executing "),
   read(Key, RightKey).
+%the element matches, we put the Value in the list and continue the search for matching values on both subtrees
+match(Value, {_, Value, LeftNode, RightNode}) ->
+  [Value |  match(Value,LeftNode) ++ match(Value,RightNode)];
+%a little divide an conquer, we traverse both subtrees to fill up a list
+match(Element, {_, _, LeftNode, RightNode}) ->
+  match(Element, LeftNode) ++ match(Element, RightNode);
 
-match(_,{empty})->
-  {empty};
+%went to empty node
+match(_, {empty}) ->
+  [].
 
-match(Value, {Key,T_Value,_,_})when Value =:= T_Value->
-  [Key,T_Value];
-match(Value,{_,T_Value,Left,Right})when Value /=T_Value->
-  LeftAlt = match(Value,Left),
-  RightAlt = match(Value,Right),
-  if
-    LeftAlt == {empty} andalso RightAlt == {empty}->
-      {error,nonexisting};
-    LeftAlt /= {empty} andalso RightAlt == {empty}->
-      LeftAlt;
-    LeftAlt == {empty} andalso RightAlt /= {empty}->
-      RightAlt;
-    true->
-      LeftAlt ++ RightAlt
-
-  end.
 
 
 countNode({empty})->
